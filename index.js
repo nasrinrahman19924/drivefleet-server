@@ -17,12 +17,13 @@ const port = process.env.PORT;
 app.use(cors({
   origin: [
     "http://localhost:3000",
-    "https://your-frontend-name.vercel.app"
+    "https://drivefleet-client-dd1z.vercel.app"
   ],
   credentials: true
 }));
 
 app.use(express.json());
+
 app.use(cookieParser());
 
 const uri = process.env.MONGODB_URI;
@@ -70,7 +71,7 @@ const verifyToken = (req, res, next) => {
 async function run() {
   try {
 
-  // await client.connect();
+    // await client.connect();
 
 
     const db = client.db("driveFleetDB");
@@ -78,176 +79,184 @@ async function run() {
     const carsCollection = db.collection("cars");
     const bookingsCollection = db.collection("bookings");
 
-  
 
 
-     app.post('/jwt', async (req, res) => {
 
-      const user = req.body
+    app.post("/jwt", async (req, res) => {
+
+      const user = req.body;
 
       const token = jwt.sign(
         user,
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      )
+        {
+          expiresIn: "7d",
+        }
+      );
 
-      res
-        .cookie('token', token, {
-          httpOnly: true,
-          secure: false,
-          sameSite: 'lax'
-        })
-        .send({ success: true })
+      res.cookie("token", token, {
+        httpOnly: true,
+
+        secure:
+          process.env.NODE_ENV === "production",
+
+        sameSite:
+          process.env.NODE_ENV === "production"
+            ? "none"
+            : "lax",
+      });
+
+      res.send({ success: true });
     });
 
     app.post('/logout', async (req, res) => {
 
-  res
-    .clearCookie('token')
-    .send({ success: true })
+      res
+        .clearCookie('token')
+        .send({ success: true })
 
-});
+    });
 
-app.post('/cars', verifyToken, async (req, res) => {
+    app.post('/cars', verifyToken, async (req, res) => {
 
-  const carData = req.body
+      const carData = req.body
 
-  const result = await carsCollection.insertOne(carData);
+      const result = await carsCollection.insertOne(carData);
 
-  res.send(result);
+      res.send(result);
 
-});
+    });
 
-app.get("/cars", async (req, res) => {
-  const search = req.query.search || "";
+    app.get("/cars", async (req, res) => {
+      const search = req.query.search || "";
 
-  const type = req.query.type || "";
+      const type = req.query.type || "";
 
-  let query = {};
+      let query = {};
 
-  if (search) {
-    query.carName = {
-      $regex: search,
-      $options: "i",
-    };
-  }
+      if (search) {
+        query.carName = {
+          $regex: search,
+          $options: "i",
+        };
+      }
 
-  if (type) {
-    query.type = type;
-  }
+      if (type) {
+        query.type = type;
+      }
 
-  const result = await carsCollection
-    .find(query)
-    .toArray();
+      const result = await carsCollection
+        .find(query)
+        .toArray();
 
-  res.send(result);
-});
-
-
-app.get('/cars/:id', async (req, res) => {
-
-  const id = req.params.id
-
-  const query = {
-    _id: new ObjectId(id)
-  }
-
-  const result = await carsCollection.findOne(query)
-
-  res.send(result)
-
-});
-
-app.get("/my-cars", async (req, res) => {
-  const email = req.query.email;
-
-  const result = await carsCollection
-    .find({ ownerEmail: email })
-    .toArray();
-
-  res.send(result);
-});
+      res.send(result);
+    });
 
 
-app.delete('/cars/:id', verifyToken, async (req, res) => {
+    app.get('/cars/:id', async (req, res) => {
 
-  const id = req.params.id
+      const id = req.params.id
 
-  const query = {
-    _id: new ObjectId(id)
-  }
+      const query = {
+        _id: new ObjectId(id)
+      }
 
-  const result = await carsCollection.deleteOne(query)
+      const result = await carsCollection.findOne(query)
 
-  res.send(result)
+      res.send(result)
 
-});
+    });
 
-app.patch('/cars/:id', verifyToken, async (req, res) => {
+    app.get("/my-cars", async (req, res) => {
+      const email = req.query.email;
 
-  const id = req.params.id
+      const result = await carsCollection
+        .find({ ownerEmail: email })
+        .toArray();
 
-  const updatedData = req.body
+      res.send(result);
+    });
 
-  const query = {
-    _id: new ObjectId(id)
-  }
 
-  const updatedDoc = {
-    $set: updatedData
-  }
+    app.delete('/cars/:id', verifyToken, async (req, res) => {
 
-  const result = await carsCollection.updateOne(
-    query,
-    updatedDoc
-  )
+      const id = req.params.id
 
-  res.send(result)
+      const query = {
+        _id: new ObjectId(id)
+      }
 
-});
+      const result = await carsCollection.deleteOne(query)
 
-app.post('/bookings', verifyToken, async (req, res) => {
+      res.send(result)
 
-  const bookingData = req.body
+    });
 
-  const result = await bookingsCollection.insertOne(bookingData)
+    app.patch('/cars/:id', verifyToken, async (req, res) => {
 
-  await carsCollection.updateOne(
-  { _id: new ObjectId(bookingData.carId) },
-  {
-    $inc: {
-      booking_count: 1
-    }
-  }
-)
+      const id = req.params.id
 
-  res.send(result)
+      const updatedData = req.body
 
-});
+      const query = {
+        _id: new ObjectId(id)
+      }
 
-app.get('/bookings/:email', verifyToken, async (req, res) => {
+      const updatedDoc = {
+        $set: updatedData
+      }
 
-  const email = req.params.email
+      const result = await carsCollection.updateOne(
+        query,
+        updatedDoc
+      )
 
-  const query = {
-    userEmail: email
-  }
+      res.send(result)
 
-  const result = await bookingsCollection.find(query).toArray()
+    });
 
-  res.send(result)
+    app.post('/bookings', verifyToken, async (req, res) => {
 
-});
-app.delete("/bookings/:id", async (req, res) => {
+      const bookingData = req.body
 
-  const id = req.params.id;
+      const result = await bookingsCollection.insertOne(bookingData)
 
-  const result = await bookingsCollection.deleteOne({
-    _id: new ObjectId(id),
-  });
+      await carsCollection.updateOne(
+        { _id: new ObjectId(bookingData.carId) },
+        {
+          $inc: {
+            booking_count: 1
+          }
+        }
+      )
 
-  res.send(result);
-});
+      res.send(result)
+
+    });
+
+    app.get('/bookings/:email', verifyToken, async (req, res) => {
+
+      const email = req.params.email
+
+      const query = {
+        userEmail: email
+      }
+
+      const result = await bookingsCollection.find(query).toArray()
+
+      res.send(result)
+
+    });
+    app.delete("/bookings/:id", async (req, res) => {
+
+      const id = req.params.id;
+
+      const result = await bookingsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      res.send(result);
+    });
 
 
 
